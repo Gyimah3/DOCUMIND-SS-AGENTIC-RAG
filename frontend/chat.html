@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind</title>
+    <link rel="stylesheet" href="{{ base_path }}/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Auth View -->
+        <div id="authView" class="auth-view">
+            <div class="auth-card">
+                <div class="logo" style="margin-bottom: 32px; justify-content: center;">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20"
+                            height="20">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <span class="logo-text">DocuMind</span>
+                </div>
+                <h1 style="font-size: 24px; margin-bottom: 8px; text-align: center;">Welcome back</h1>
+                <p style="color: var(--text-muted); text-align: center; margin-bottom: 32px; font-size: 14px;">Sign in
+                    to continue to your workspace</p>
+
+                <div id="authError" class="auth-error hidden"></div>
+
+                <form id="loginForm" class="auth-form" style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Email
+                            address</label>
+                        <input type="email" id="loginEmail" name="email" required placeholder="name@company.com"
+                            style="padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; outline: none;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Password</label>
+                        <input type="password" id="loginPassword" name="password" required placeholder="••••••••"
+                            style="padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; outline: none;">
+                    </div>
+                    <button type="submit" class="btn btn-send"
+                        style="padding: 12px; border-radius: 8px; font-weight: 600; width: 100%; border: none;">Sign
+                        in</button>
+                    <p style="text-align: center; font-size: 14px; color: var(--text-muted);">
+                        Don't have an account? <button type="button" id="showRegister"
+                            class="btn-link">Register</button>
+                    </p>
+                </form>
+
+                <form id="registerForm" class="auth-form hidden"
+                    style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">First name</label>
+                            <input type="text" id="regFirst" name="first_name" required
+                                style="padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">Last name</label>
+                            <input type="text" id="regLast" name="last_name" required
+                                style="padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-muted);">Email</label>
+                        <input type="email" id="regEmail" name="email" required
+                            style="padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-muted);">Password</label>
+                        <input type="password" id="regPassword" name="password" required minlength="8"
+                            style="padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    </div>
+                    <button type="submit" class="btn btn-send"
+                        style="padding: 12px; border-radius: 8px; font-weight: 600; margin-top: 8px; border: none;">Create
+                        account</button>
+                    <p style="text-align: center; font-size: 14px; color: var(--text-muted);">
+                        Already have an account? <button type="button" id="showLogin" class="btn-link">Sign in</button>
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <!-- App View -->
+        <div id="appView" class="app-container hidden">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20"
+                            height="20">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <span class="logo-text">DocuMind</span>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Main</span>
+                    <button class="nav-item active" id="navChat">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Chats</span>
+                    </button>
+                    <button class="nav-item" id="navDocuments">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>Documents</span>
+                    </button>
+                    <button class="nav-item" id="navAnalytics">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        <span>Analytics</span>
+                    </button>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Settings</span>
+                    <button class="nav-item" id="navSettings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
+                        <span>Settings</span>
+                    </button>
+                    <button class="nav-item" id="logoutBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Log out</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="user-profile">
+                        <div class="user-avatar" id="avatarLetter">U</div>
+                        <div class="user-info">
+                            <span class="user-name" id="userNameText">User Account</span>
+                            <span class="user-email-text" id="userEmailText">user@example.com</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- Panel: Side (Documents, Chunks, Context) -->
+                <section class="side-panel">
+                    <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                            <h2 id="panelTitle">Knowledge Context</h2>
+                        </div>
+
+                        <!-- Panel Tabs -->
+                        <div
+                            style="display: flex; gap: 8px; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            <button class="nav-item active" style="font-size: 13px; padding: 6px 10px; margin: 0;"
+                                id="tabDocs">Docs</button>
+                            <button class="nav-item" style="font-size: 13px; padding: 6px 10px; margin: 0;"
+                                id="tabChunks">Chunks</button>
+                            <button class="nav-item" style="font-size: 13px; padding: 6px 10px; margin: 0;"
+                                id="tabContext">Context</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-body" id="panelBody">
+                        <div id="docsViewPanel">
+                            <div id="kbList"></div>
+                        </div>
+
+                        <div id="chunksViewPanel" class="hidden">
+                            <div id="relevantChunks"></div>
+                        </div>
+
+                        <div id="contextViewPanel" class="hidden">
+                            <div id="contextContent"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel-footer">
+                        <div class="storage-info">
+                            <span>Storage used</span>
+                            <span id="storagePercent">45% of 500MB</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 45%;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel: Chat View -->
+                <section class="chat-view" id="chatView">
+                    <header class="chat-header">
+                        <div class="chat-title">
+                            <span id="activeIndexName" style="color: var(--text-muted); font-weight: 400;">Active
+                                Knowledge Base:
+                            </span>
+                            <span id="indexNameLabel" style="font-weight: 600;">All Documents</span>
+                        </div>
+                    </header>
+
+                    <div class="chat-display" id="chatDisplay">
+                        <!-- Messages populated by JS -->
+                        <div class="ai-message message">
+                            Hello! I'm your AI document assistant. Attach an index from the menu or select one on the
+                            left to start chatting about your documents.
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <div id="activeTagContainer" class="active-tag-container"></div>
+                        <div class="input-wrapper">
+                            <button class="btn-plus" id="plusBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20"
+                                    height="20">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+
+                            <!-- Plus Menu -->
+                            <div id="plusMenu" class="plus-menu">
+                                <div class="plus-menu-item" id="menuUpload">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        width="18" height="18">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    <span>Upload Document</span>
+                                </div>
+                                <div class="plus-menu-divider"></div>
+                                <div class="plus-menu-header">Tag Document</div>
+                                <div id="indexListMenu" class="index-list-mini">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <input type="text" id="userInput" placeholder="Ask a question about your documents...">
+                            <div class="input-actions">
+                                <button class="btn-icon btn-send" id="sendButton">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        width="18" height="18">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Upload Modal -->
+                    <div id="uploadModal" class="modal-overlay">
+                        <div class="modal">
+                            <div class="modal-header">
+                                <h3 style="margin: 0; font-size: 18px;">Upload Document</h3>
+                                <button class="btn-icon" id="closeUploadModal">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        width="20" height="20">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-field">
+                                    <label>Select File</label>
+                                    <input type="file" id="modalFileInput">
+                                </div>
+                                <div class="form-field">
+                                    <label>Document Identifier</label>
+                                    <input type="text" id="modalIndexName" placeholder="e.g. medical-reports-2024">
+                                </div>
+                                <div class="form-field">
+                                    <label>Processing Options</label>
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-item">
+                                            <input type="checkbox" id="checkMultimodal">
+                                            Multimodal
+                                        </label>
+                                        <label class="checkbox-item">
+                                            <input type="checkbox" id="checkExtractTables" checked>
+                                            Extract Tables
+                                        </label>
+                                        <label class="checkbox-item">
+                                            <input type="checkbox" id="checkExtractImages">
+                                            Extract Images
+                                        </label>
+                                    </div>
+                                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+                                        Note: Multimodal processing automatically enables image extraction.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="modal-btn modal-btn-secondary" id="cancelUpload">Cancel</button>
+                                <button class="modal-btn modal-btn-primary" id="startUpload">Upload</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Document Preview Modal -->
+                <div id="previewModal" class="modal-overlay hidden">
+                    <div class="modal-container preview-modal-container">
+                        <div class="modal-header">
+                            <div class="modal-title-group">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"
+                                    height="20">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                                <h2 id="previewTitle">Document Preview</h2>
+                            </div>
+                            <div style="flex: 1;"></div>
+                            <a id="openExternalBtn" href="#" target="_blank" class="btn-icon" title="Open in New Tab"
+                                style="margin-right: 8px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: inherit; width: 32px; height: 32px; border-radius: 6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                                    height="18">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </a>
+                            <button class="modal-close" id="closePreviewModal">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20"
+                                    height="20">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="modal-body preview-body" style="padding: 0; display: flex; flex-direction: column;">
+                            <iframe id="previewFrame" src="" frameborder="0"
+                                style="width: 100%; flex-grow: 1; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;"></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Documents Management View -->
+                <section class="chat-view hidden" id="documentsView" style="padding: 40px; overflow-y: auto;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h1 style="margin: 0;">Global Documents</h1>
+                        <button class="nav-btn" id="refreshAllDocs"
+                            style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"
+                                height="16">
+                                <path
+                                    d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                </path>
+                            </svg>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+
+                    <div class="docs-table-wrapper"
+                        style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead>
+                                <tr
+                                    style="background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color);">
+                                    <th
+                                        style="padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted);">
+                                        Title</th>
+                                    <th
+                                        style="padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted);">
+                                        Index</th>
+                                    <th
+                                        style="padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted);">
+                                        Created At</th>
+                                    <th
+                                        style="padding: 16px; text-align: right; font-weight: 600; color: var(--text-muted);">
+                                        Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allDocsTableBody">
+                                <!-- Rows will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Placeholder: Analytics View -->
+                <section class="chat-view hidden" id="analyticsView" style="padding: 40px;">
+                    <h1>Analytics</h1>
+                    <p style="color: var(--text-muted); margin-top: 12px;">Usage analytics and document insights will
+                        appear here.</p>
+                </section>
+
+                <!-- Placeholder: Settings View -->
+                <section class="chat-view hidden" id="settingsView" style="padding: 40px;">
+                    <h1>Settings</h1>
+                    <p style="color: var(--text-muted); margin-top: 12px;">Manage your account and API preferences.</p>
+                </section>
+            </main>
+        </div>
+    </div>
+    <div id="toastContainer" class="toast-container"></div>
+    <script src="{{ base_path }}/script.js?v=2"></script>
+</body>
+
+</html>

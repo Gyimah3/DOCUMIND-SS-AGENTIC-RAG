@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind - Manage Documents</title>
+    <link rel="stylesheet" href="{{ base_path }}/styles.css">
+    <style>
+        .docs-container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .docs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .docs-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .docs-table th,
+        .docs-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .docs-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .docs-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .btn-delete {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .btn-delete:hover {
+            background: #dc3545;
+            color: white;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-index {
+            background: #e7f3ff;
+            color: #007bff;
+        }
+
+        .batch-actions {
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <a href="/rag"><img src="{{ base_path }}/assets/logo.svg" alt="DocuMind Logo"></a>
+            </div>
+            <div class="actions">
+                <span id="userEmail" class="user-email"></span>
+                <a href="/rag" class="btn btn-secondary">Back to Chat</a>
+            </div>
+        </header>
+
+        <main class="docs-container">
+            <div class="docs-header">
+                <h1>Manage Documents</h1>
+                <div class="index-select">
+                    <select id="indexFilter" class="form-control">
+                        <option value="">Select Index...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="batch-actions hidden" id="batchActions">
+                <button id="deleteAllBtn" class="btn btn-delete">Delete All in Index</button>
+            </div>
+
+            <table class="docs-table" id="docsTable">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Upload Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="docsList">
+                    <!-- Documents will be loaded here -->
+                </tbody>
+            </table>
+            <div id="emptyState" class="empty-state hidden">
+                <p>No documents found in this index.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ base_path }}/documents.js"></script>
+</body>
+
+</html>

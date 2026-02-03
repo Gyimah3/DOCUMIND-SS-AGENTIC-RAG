@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: documindss-app
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DB_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-documindss_secret}@postgres:5432/${POSTGRES_DB:-documindss}
+      - SECRET_KEY=${SECRET_KEY:-change_this_secret_key_in_production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-documindss}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - documindss-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: documindss-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-documindss_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-documindss}
+    volumes:
+      - documindss_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - documindss-network
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: documindss-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "8002:8001"  # RedisInsight UI on 8002 to avoid conflict with app
+    volumes:
+      - documindss_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - documindss-network
+
+volumes:
+  documindss_postgres_data:
+    driver: local
+  documindss_redis_data:
+    driver: local
+
+networks:
+  documindss-network:
+    driver: bridge

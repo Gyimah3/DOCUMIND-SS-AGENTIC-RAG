@@ -1,0 +1,15 @@
+text:
+- name: content
+tag:
+- name: filename
+- name: tag
+- name: created_at
+- name: modified
+- name: type
+- name: page_number
+vector:
+- name: content_vector
+  algorithm: FLAT
+  datatype: FLOAT32
+  dims: 1536
+  distance_metric: COSINE
