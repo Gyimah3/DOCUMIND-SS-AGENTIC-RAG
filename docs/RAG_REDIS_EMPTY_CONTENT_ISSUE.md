@@ -10,7 +10,7 @@
 
 ## Technical Context
 
-- **Stack:** FastAPI app (Documind), LangChain, custom `RedisVectorStore` (`services/redis_vectorstore.py`), RediSearch (FT.SEARCH with vector KNN).
+- **Stack:** FastAPI app (DocuMindSS), LangChain, custom `RedisVectorStore` (`services/redis_vectorstore.py`), RediSearch (FT.SEARCH with vector KNN).
 - **Index schema:** HASH index with `$.content`, `$.content_vector`, etc. and `as_name="content"`, `as_name="content_vector"`.
 - **Search:** Vector search uses `Query("(*)=>[KNN k @content_vector $query_vector AS vector_score]").return_fields("filename", "content", ...).dialect(2)`.
 - **Result mapping:** We build LangChain `Document` from `results.docs` using `getattr(d, "content", None)` for page_content.

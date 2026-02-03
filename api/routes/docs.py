@@ -8,7 +8,7 @@ class DocsRouter:
         async def scalar_html():
             return get_scalar_api_reference(
                 openapi_url=app.openapi_url,  # type: ignore
-                title=app.title or "Documind API",
+                title=app.title or "DocuMindSS API",
                 theme=Theme.DEEP_SPACE,
                 servers=[
                     {

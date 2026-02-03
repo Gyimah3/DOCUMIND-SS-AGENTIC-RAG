@@ -38,7 +38,7 @@ class UserCRUD(BaseCRUD[User, UserCreate, UserUpdate]):
         page: Optional[int] = None,
         size: Optional[int] = None,
     ) -> List[User] | PaginatedResponse[User]:
-        """Get active users with optional organization/branch filtering"""
+        """Get active users"""
         filters = [FilterSchema(field="is_active", op="==", value=True)]
 
         return await self.list_objects(
@@ -123,7 +123,6 @@ class UserService:
             created_by: User ID creating this user
             audit_ip: IP address for audit log
             audit_user_agent: User agent for audit log
-            assign_org_admin_role: If True, automatically assigns Organization Admin role
 
         Returns:
             Created User instance

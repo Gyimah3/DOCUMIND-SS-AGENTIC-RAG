@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class AppConfig:
     version: str
-    title: str = "Documind API"
-    description: str = "Documind – document indexing and vector search API."
-    contact: dict[str, str] | None = field(default_factory=lambda: {"name": "Documind"})
+    title: str = "DocuMindSS API"
+    description: str = "DocuMindSS – document indexing and vector search API for Seedstars."
+    contact: dict[str, str] | None = field(default_factory=lambda: {"name": "DocuMindSS"})
     openapi_url: str = "/openapi.json"
     docs_url: str | None = "/docs"
     redoc_url: str | None = None

@@ -20,7 +20,7 @@ class AWSConfig:
     max_upload_size: int = 50 * 1024 * 1024
 
 class BaseConfig(BaseSettings):
-    APP_NAME: str = " DOCU MIND"
+    APP_NAME: str = "DocuMindSS"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     HOST: str = "0.0.0.0"

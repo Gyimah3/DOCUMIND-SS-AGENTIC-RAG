@@ -41,7 +41,7 @@ services:
     volumes:
       - documindss_postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "54323:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -55,8 +55,8 @@ services:
     container_name: documindss-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
-      - "8002:8001"  # RedisInsight UI on 8002 to avoid conflict with app
+      - "6378:6379"
+      - "8003:8001"  # RedisInsight UI
     volumes:
       - documindss_redis_data:/data
     healthcheck:

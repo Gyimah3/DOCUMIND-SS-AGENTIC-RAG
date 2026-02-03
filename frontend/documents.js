@@ -1,5 +1,5 @@
 /**
- * Document management logic for DocuMind.
+ * Document management logic for DocuMindSS.
  */
 
 const API_BASE = '/api/v1';

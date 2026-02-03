@@ -29,7 +29,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    """Update schema for user table only (no organization fields)."""
+    """Update schema for user table."""
 
     email: Optional[EmailStr] = None
     first_name: Optional[str] = None

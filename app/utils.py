@@ -4,7 +4,7 @@ import time
 from typing import Callable, Any, Literal, Tuple, Dict
 import redis
 from loguru import logger
-from services.redis_vectorstore import RedisVectorStore as DocumindRedisVectorStore
+from services.redis_vectorstore import RedisVectorStore as DocuMindSSRedisVectorStore
 from collections import OrderedDict
 from functools import wraps
 from langchain_community.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
@@ -171,7 +171,7 @@ def load_vector_store(
     """Load vector store for RAG. Uses custom RedisVectorStore (HASH schema, robust result parsing)."""
     embedding = load_embedding_model(model=embedding_model)
     client = redis.Redis.from_url(redis_url)
-    return DocumindRedisVectorStore(client=client, embedding_func=embedding)
+    return DocuMindSSRedisVectorStore(client=client, embedding_func=embedding)
 
 
 # Lazy: only call load_llm() when something needs it (avoids requiring LLM in config at import time)

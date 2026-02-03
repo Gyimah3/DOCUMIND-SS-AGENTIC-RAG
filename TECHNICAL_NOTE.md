@@ -49,7 +49,7 @@ The founder can tag a different document at any time by selecting it from the **
 
 Horo's current chat **cannot extract or understand images** inside documents. Founders upload pitch decks, financial reports, and handbooks full of charts, diagrams, and infographics — but all that visual information is invisible to the current system.
 
-**Our system solves this.** When a founder enables multimodal processing, we:
+**My system solves this.** When a founder enables multimodal processing, we:
 
 1. **Extract every image** from PDFs, DOCX, and PPTX files — including embedded charts, diagrams, screenshots, and photos
 2. **Filter out noise** — images under 30KB (icons, borders, decorative elements) are automatically skipped to avoid wasting LLM calls
@@ -259,6 +259,66 @@ Our agentic approach flips this: the LLM receives a **tool** instead of pre-load
 - Search each index concurrently with `asyncio.gather`
 - Merge results across all indexes, sort by vector score, return global top-k
 - Other founders' indexes are never touched (safe default: empty list if no user indexes found)
+
+### What retrieved documents look like
+
+When a user asks a question, we retrieve the **top-k most relevant chunks** (default k=3) using vector similarity search. Each retrieved chunk includes both the content and full metadata, enabling precise citations and transparency:
+
+```json
+{
+  "used_docs": [
+    {
+      "page_content": "The maximum loan amount for first-time borrowers is GHS 5,000. Returning borrowers with good repayment history may qualify for up to GHS 15,000...",
+      "metadata": {
+        "filename": "Loan Policy.pdf",
+        "page_number": 3,
+        "type": "text",
+        "vector_score": 0.8723
+      }
+    },
+    {
+      "page_content": "| Borrower Type | Min Amount | Max Amount |\n|---------------|------------|------------|\n| First-time | GHS 500 | GHS 5,000 |\n| Returning | GHS 1,000 | GHS 15,000 |",
+      "metadata": {
+        "filename": "Loan Policy.pdf",
+        "page_number": 4,
+        "type": "table",
+        "vector_score": 0.8156
+      }
+    },
+    {
+      "page_content": "{'Borrower': 'First-time', 'Max Loan': 5000, 'Interest Rate': '12%'}",
+      "metadata": {
+        "filename": "Loan Terms.xlsx",
+        "sheet_name": "Limits",
+        "row_number": 2,
+        "type": "text",
+        "vector_score": 0.7842
+      }
+    }
+  ]
+}
+```
+
+**What each field means:**
+
+| Field | Description |
+|-------|-------------|
+| `page_content` | The actual text/table content of the chunk that was matched |
+| `filename` | Source document name |
+| `page_number` | Page number for PDFs/DOCX/PPTX |
+| `sheet_name` | Sheet name for Excel files |
+| `row_number` | Row number for Excel/CSV files |
+| `type` | Chunk type: `text`, `table`, or `image` |
+| `vector_score` | Cosine similarity score (0-1, higher = more relevant) |
+
+**How the frontend uses this:**
+
+The frontend displays the context that was used to generate the answer, showing:
+- For PDFs/DOCX: `Loan Policy.pdf (Page 3)` with score `0.8723`
+- For Excel: `Loan Terms.xlsx (Sheet "Limits", Row 2)` with score `0.7842`
+- For tables: The markdown table is rendered properly
+
+Users can expand each chunk to see the full content, verify the source, and understand why that chunk was retrieved. This transparency builds trust — founders know exactly which parts of their documents the AI is referencing.
 
 ### Streaming response
 
