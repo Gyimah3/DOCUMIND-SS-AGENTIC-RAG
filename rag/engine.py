@@ -16,7 +16,7 @@ from app.config import settings
 
 os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "documind"
+os.environ["LANGCHAIN_PROJECT"] = "documindss"
 
 
 class GraphState(TypedDict):
