@@ -34,10 +34,16 @@ _RULES: List[Tuple[str, re.Pattern, str]] = [
         re.compile(r"\b[A-Z]{2}\d{2}[\s]?[\dA-Z]{4}[\s]?(?:[\dA-Z]{4}[\s]?){2,7}[\dA-Z]{1,4}\b"),
         "[IBAN REDACTED]",
     ),
-    # Generic bank account numbers: 8-17 digits (only when preceded by contextual keyword)
+    # Bank account, routing, sort code numbers (keyword + digits)
     (
         "ACCOUNT",
-        re.compile(r"(?i)(?:account|acct|a/c)[\s.#:_-]*(\d[\d\s-]{6,16}\d)"),
+        re.compile(r"(?i)(?:account|acct|a/c|routing|sort\s*code|swift|bic|branch\s*code|bank\s*code)[\s.#:_-]*(\d[\d\s-]{6,16}\d)"),
+        "[ACCOUNT REDACTED]",
+    ),
+    # Account number on same line (e.g. "Account Number: 1234567890")
+    (
+        "ACCOUNT_LINE",
+        re.compile(r"(?i)(?:account|acct)\s*(?:number|no|#|num)[\s:=]+[^\n]+"),
         "[ACCOUNT REDACTED]",
     ),
     # Email addresses
@@ -58,11 +64,17 @@ _RULES: List[Tuple[str, re.Pattern, str]] = [
         re.compile(r"(?i)(?:passport)[\s.#:_-]*([A-Z]{1,2}\d{6,9})\b"),
         "[PASSPORT REDACTED]",
     ),
-    # National ID / Tax ID patterns with keyword context
+    # National ID / Tax ID / Driver's license patterns with keyword context
     (
         "ID_NUMBER",
-        re.compile(r"(?i)(?:national\s*id|tax\s*id|tin|ein|ssn|id\s*number|id\s*no)[\s.#:_-]*(\d[\d\s-]{4,12}\d)"),
+        re.compile(r"(?i)(?:national\s*id|tax\s*id|tin|ein|ssn|id\s*number|id\s*no|driver'?s?\s*licen[sc]e|license\s*no)[\s.#:_-]*(\d[\d\s-]{4,12}\d)"),
         "[ID REDACTED]",
+    ),
+    # Passwords, secrets, API keys (keyword + rest of line as value)
+    (
+        "PASSWORD",
+        re.compile(r"(?i)\**\w*[_\s]?(?:password|passwd|secret|api[_\s]?key|access[_\s]?key|private[_\s]?key|token)\**[\s:=]+[^\n]+"),
+        "[CREDENTIAL REDACTED]",
     ),
 ]
 

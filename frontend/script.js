@@ -326,8 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     menuUpload.onclick = () => {
         plusMenu.classList.remove('show');
+        modalIndexName.value = '';
+        modalFileInput.value = '';
         uploadModal.classList.add('show');
-        if (selectedIndexName) modalIndexName.value = selectedIndexName;
     };
 
 
@@ -728,6 +729,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.stream) {
                             clearInterval(typingInterval);
                             accumulatedText += data.stream;
+                            aiMsgDiv.innerHTML = marked.parse(accumulatedText);
+                        } else if (data.pii_cleaned) {
+                            // Server detected PII in the full response — replace with masked version
+                            accumulatedText = data.pii_cleaned;
                             aiMsgDiv.innerHTML = marked.parse(accumulatedText);
                         } else if (data.used_docs) {
                             usedDocs = data.used_docs;

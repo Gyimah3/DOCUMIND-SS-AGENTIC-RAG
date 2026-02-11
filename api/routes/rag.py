@@ -123,6 +123,7 @@ class RagRouter(BaseRouter):
         ).compile_graph(checkpointer=_checkpointer)
 
         async def stream_model_response() -> AsyncGenerator[str, None]:
+            accumulated_text = ""
             async for stream in engine.astream_events(
                 {"messages": [("human", input_body.message)]},
                 version="v2",
@@ -133,17 +134,23 @@ class RagRouter(BaseRouter):
                     chunk = stream.get("data", {}).get("chunk")
                     if chunk and (content := getattr(chunk, "content", None)):
                         content_str = str(content)
-                        if (content_str.strip().startswith("{") and 
+                        if (content_str.strip().startswith("{") and
                             any(keyword in content_str for keyword in ["intent", "rephrased", "confidence"])):
                             continue
-                        
+
                         if isinstance(content, list):
                             if content and isinstance(content[0], dict) and "text" in content[0]:
-                                yield json.dumps({"stream": mask_pii(str(content[0]["text"]))}) + "\n"
+                                token = str(content[0]["text"])
+                                accumulated_text += token
+                                yield json.dumps({"stream": token}) + "\n"
                             elif not (content and isinstance(content[0], dict) and content[0].get("type") == "tool_use"):
-                                yield json.dumps({"stream": mask_pii(str(content))}) + "\n"
+                                token = str(content)
+                                accumulated_text += token
+                                yield json.dumps({"stream": token}) + "\n"
                         else:
-                            yield json.dumps({"stream": mask_pii(content) if isinstance(content, str) else content}) + "\n"
+                            token = content if isinstance(content, str) else str(content)
+                            accumulated_text += token
+                            yield json.dumps({"stream": token}) + "\n"
                 elif event == "on_retriever_end":
                     results = stream.get("data", {}).get("output", [])
                     used = []
@@ -158,5 +165,13 @@ class RagRouter(BaseRouter):
                         else:
                             used.append({"content": mask_pii(str(r))})
                     yield json.dumps({"used_docs": used}) + "\n"
+
+            # Final pass: mask PII on the full accumulated response.
+            # Streaming sends tokens too small for regex to match (e.g. an
+            # email split across chunks). This pass catches everything and
+            # sends a replacement event the frontend applies over the full text.
+            masked_text = mask_pii(accumulated_text)
+            if masked_text != accumulated_text:
+                yield json.dumps({"pii_cleaned": masked_text}) + "\n"
 
         return StreamingResponse(stream_model_response(), media_type="application/x-ndjson")
