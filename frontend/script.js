@@ -714,13 +714,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let usedDocs = [];
+            let buffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                // Keep the last (possibly incomplete) line in the buffer
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
                     if (!line.trim()) continue;
@@ -731,7 +734,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             accumulatedText += data.stream;
                             aiMsgDiv.innerHTML = marked.parse(accumulatedText);
                         } else if (data.pii_cleaned) {
-                            // Server detected PII in the full response — replace with masked version
                             accumulatedText = data.pii_cleaned;
                             aiMsgDiv.innerHTML = marked.parse(accumulatedText);
                         } else if (data.used_docs) {
@@ -740,6 +742,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } catch (e) { }
                 }
+            }
+            // Process any remaining data in the buffer
+            if (buffer.trim()) {
+                try {
+                    const data = JSON.parse(buffer);
+                    if (data.pii_cleaned) {
+                        accumulatedText = data.pii_cleaned;
+                        aiMsgDiv.innerHTML = marked.parse(accumulatedText);
+                    } else if (data.used_docs) {
+                        usedDocs = data.used_docs;
+                        updateContext(usedDocs);
+                    }
+                } catch (e) { }
             }
 
             // Re-render with sources
