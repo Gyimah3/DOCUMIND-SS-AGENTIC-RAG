@@ -745,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 footer.style.borderTop = '2px solid var(--primary-light)';
                 footer.style.marginTop = '16px';
                 footer.style.paddingTop = '12px';
-                footer.innerHTML = '<span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Source File:</span>';
+                footer.innerHTML = '<span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Sources Searched:</span>';
 
                 // Group pages/rows by filename
                 const fileGroups = {};
@@ -818,12 +818,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const locationInfo = doc.metadata?.sheet_name
                     ? `<strong>Sheet:</strong> ${doc.metadata.sheet_name}<br><strong>Row:</strong> ${doc.metadata.row_number || 'N/A'}`
                     : `<strong>Page:</strong> ${doc.metadata?.page_number || 'N/A'}`;
+                const cosineScore = doc.metadata?.vector_score ? Number(doc.metadata.vector_score).toFixed(4) : 'N/A';
+                const rerankScore = doc.metadata?.rerank_score != null ? Number(doc.metadata.rerank_score).toFixed(4) : null;
+                const scoresHtml = rerankScore
+                    ? `<div style="display: flex; gap: 16px; margin-top: 4px;">
+                        <span><strong>Cosine:</strong> ${cosineScore}</span>
+                        <span style="color: var(--text-muted);">|</span>
+                        <span><strong>Relevance:</strong> ${rerankScore}</span>
+                       </div>`
+                    : `<strong>Score:</strong> ${cosineScore}`;
                 contextContent.innerHTML = `
                     <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--text-muted);">Chunk #${chunkNumber} Details</h3>
                     <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
                         <strong>File:</strong> ${doc.metadata?.filename || 'Unknown'}<br>
                         ${locationInfo}<br>
-                        <strong>Score:</strong> ${doc.metadata?.vector_score ? Number(doc.metadata.vector_score).toFixed(4) : 'N/A'}
+                        ${scoresHtml}
                     </div>
                     <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
                         ${doc.page_content}
@@ -835,18 +844,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Set initial preview if context is empty
         if (docs.length > 0 && contextContent.innerHTML.includes('Content Preview')) {
-            // We don't call onclick here to avoid switching tab immediately on load
-            // but we can populate the content
             const doc = docs[0];
             const initLocationInfo = doc.metadata?.sheet_name
                 ? `<strong>Sheet:</strong> ${doc.metadata.sheet_name}<br><strong>Row:</strong> ${doc.metadata.row_number || 'N/A'}`
                 : `<strong>Page:</strong> ${doc.metadata?.page_number || 'N/A'}`;
+            const initCosine = doc.metadata?.vector_score ? Number(doc.metadata.vector_score).toFixed(4) : 'N/A';
+            const initRerank = doc.metadata?.rerank_score != null ? Number(doc.metadata.rerank_score).toFixed(4) : null;
+            const initScoresHtml = initRerank
+                ? `<div style="display: flex; gap: 16px; margin-top: 4px;">
+                    <span><strong>Cosine:</strong> ${initCosine}</span>
+                    <span style="color: var(--text-muted);">|</span>
+                    <span><strong>Relevance:</strong> ${initRerank}</span>
+                   </div>`
+                : `<strong>Score:</strong> ${initCosine}`;
             contextContent.innerHTML = `
                 <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--text-muted);">Chunk #1 Details</h3>
                 <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
                     <strong>File:</strong> ${doc.metadata?.filename || 'Unknown'}<br>
                     ${initLocationInfo}<br>
-                    <strong>Score:</strong> ${doc.metadata?.vector_score ? Number(doc.metadata.vector_score).toFixed(4) : 'N/A'}
+                    ${initScoresHtml}
                 </div>
                 <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
                     ${doc.page_content}

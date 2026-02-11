@@ -23,6 +23,7 @@ from sqlalchemy import select
 from database.models.vectorstore import VectorStore
 from database.models.data_source import DataSource
 from loguru import logger
+from services.pii_masker import mask_pii
 
 def _get_llm():
     """Return ChatOpenAI LLM from app config (OpenAI API key)."""
@@ -66,7 +67,7 @@ class RagRouter(BaseRouter):
         current_user: User = Depends(get_current_user),
         index_name: str | None = Query(None, description="Vectorstore index name (optional; if None, searches all indexes)"),
         embedding_model: str = Query("text-embedding-3-small", description="Embedding model"),
-        top_k: int = Query(3, description="Number of chunks to retrieve"),
+        top_k: int = Query(5, description="Number of chunks to retrieve"),
     ) -> Any:
         """Stream RAG response; body must include { \"message\": \"...\" }."""
 
@@ -110,8 +111,9 @@ class RagRouter(BaseRouter):
         tool = InformationLookupTool(
             embedding_model=embedding_model,
             index_name=index_name,
-            top_k=3,
+            top_k=top_k,
             user_index_names=user_index_names,
+            rerank=True,
         )
         engine: CompiledGraph = RagEngine(
             llm=_get_llm(),
@@ -137,21 +139,24 @@ class RagRouter(BaseRouter):
                         
                         if isinstance(content, list):
                             if content and isinstance(content[0], dict) and "text" in content[0]:
-                                yield json.dumps({"stream": str(content[0]["text"])}) + "\n"
+                                yield json.dumps({"stream": mask_pii(str(content[0]["text"]))}) + "\n"
                             elif not (content and isinstance(content[0], dict) and content[0].get("type") == "tool_use"):
-                                yield json.dumps({"stream": str(content)}) + "\n"
+                                yield json.dumps({"stream": mask_pii(str(content))}) + "\n"
                         else:
-                            yield json.dumps({"stream": content}) + "\n"
+                            yield json.dumps({"stream": mask_pii(content) if isinstance(content, str) else content}) + "\n"
                 elif event == "on_retriever_end":
                     results = stream.get("data", {}).get("output", [])
                     used = []
                     for r in results:
                         if hasattr(r, "page_content"):
-                            used.append({"page_content": r.page_content, "metadata": getattr(r, "metadata", {})})
+                            used.append({
+                                "page_content": mask_pii(r.page_content),
+                                "metadata": getattr(r, "metadata", {}),
+                            })
                         elif isinstance(r, dict):
                             used.append(r)
                         else:
-                            used.append({"content": str(r)})
+                            used.append({"content": mask_pii(str(r))})
                     yield json.dumps({"used_docs": used}) + "\n"
 
         return StreamingResponse(stream_model_response(), media_type="application/x-ndjson")

@@ -371,6 +371,8 @@ class RedisVectorStore(BaseModel):
         key_prefix: str | None = None,
         search_kwargs: dict | None = None,
         user_index_names: List[str] | None = None,
+        reranker: Any | None = None,
+        candidates_multiplier: int = 3,
     ) -> "RedisVectorStoreRetriever":
         """Return a retriever that uses this store's search (for RAG)."""
         search_kwargs = search_kwargs or {}
@@ -381,17 +383,21 @@ class RedisVectorStore(BaseModel):
             key_prefix=key_prefix or (index_name if index_name else "default"),
             k=k,
             user_index_names=user_index_names,
+            reranker=reranker,
+            candidates_multiplier=candidates_multiplier,
         )
 
 
 class RedisVectorStoreRetriever(BaseRetriever):
-    """Retriever that uses RedisVectorStore.search (async)."""
+    """Retriever that uses RedisVectorStore.search (async), with optional re-ranking."""
 
     vectorstore: RedisVectorStore
     index_name: str | None  # Optional: if None, searches all indexes
     key_prefix: str
     k: int = 5
     user_index_names: List[str] | None = None  # Scoped list of indexes for multi-index search
+    reranker: Any | None = None  # Optional reranker module (services.reranker)
+    candidates_multiplier: int = 3  # Over-retrieve factor when re-ranking
 
     class Config:
         arbitrary_types_allowed = True
@@ -399,7 +405,17 @@ class RedisVectorStoreRetriever(BaseRetriever):
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun | None = None
     ) -> List[Document]:
-        # Sync fallback: run async search in event loop
+        if self.reranker is not None:
+            fetch_k = self.k * self.candidates_multiplier
+            candidates = asyncio.run(self.vectorstore.search(
+                self.index_name, query, k=fetch_k, user_index_names=self.user_index_names
+            ))
+            logger.info(
+                "Re-ranking: {} candidates → top {}",
+                len(candidates), self.k,
+            )
+            return self.reranker.rerank_sync(query, candidates, top_k=self.k)
+
         return asyncio.run(self.vectorstore.search(
             self.index_name, query, k=self.k, user_index_names=self.user_index_names
         ))
@@ -407,6 +423,17 @@ class RedisVectorStoreRetriever(BaseRetriever):
     async def _aget_relevant_documents(
         self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun | None = None
     ) -> List[Document]:
+        if self.reranker is not None:
+            fetch_k = self.k * self.candidates_multiplier
+            candidates = await self.vectorstore.search(
+                self.index_name, query, k=fetch_k, user_index_names=self.user_index_names
+            )
+            logger.info(
+                "Re-ranking: {} candidates → top {}",
+                len(candidates), self.k,
+            )
+            return await self.reranker.rerank(query, candidates, top_k=self.k)
+
         return await self.vectorstore.search(
             self.index_name, query, k=self.k, user_index_names=self.user_index_names
         )

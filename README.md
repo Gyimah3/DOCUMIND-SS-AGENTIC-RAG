@@ -8,6 +8,10 @@ An intelligent document processing and RAG (Retrieval-Augmented Generation) syst
 
 - **Multi-format Document Support**: PDF, DOCX, XLSX, CSV, PPTX, Markdown, HTML, and plain text
 - **Agentic RAG**: Intent-aware query routing using LangGraph for intelligent document retrieval
+- **FlashRank Re-ranking**: Cross-encoder re-ranking layer between retrieval and generation for significantly improved answer relevance (see [Re-ranking & Evaluators](#re-ranking--evaluators))
+- **Source Citations**: Answers include exact document name and page references (e.g., *"Loan Policy.pdf (Page 3)"*)
+- **"I Don't Know" Fallback**: When the answer isn't in the documents, the system says so and suggests which file to upload
+- **PII / Sensitive ID Masking**: Regex-based redaction of SSNs, card numbers, IBANs, account numbers, emails, and phone numbers in all responses and retrieved chunks before they reach the user
 - **Multimodal Processing**: Extract and index images from documents with AI-generated descriptions
 - **Dedicated Table Extraction**: Preserves table structure from PDFs and documents
 - **Multi-tenant Architecture**: Secure user isolation with per-user document indexes
@@ -18,7 +22,7 @@ An intelligent document processing and RAG (Retrieval-Augmented Generation) syst
 
 - **Backend**: FastAPI, Python 3.12
 - **Database**: PostgreSQL 16 (metadata), Redis Stack (vectors)
-- **AI/ML**: OpenAI GPT-4, LangChain, LangGraph
+- **AI/ML**: OpenAI GPT-4, LangChain, LangGraph, FlashRank (ONNX re-ranker)
 - **Storage**: AWS S3 for document storage
 - **Document Processing**: PyMuPDF, pdfplumber, python-docx, unstructured
 
@@ -152,6 +156,58 @@ DocuMindSS/
 ├── docker-compose.yml
 └── requirements.txt
 ```
+
+## RAG Pipeline Overview
+
+```
+User query
+  → Intent detection (DOCUMENT_QUERY vs GENERAL_CONVERSATION)
+  → Query rephrasing (better search terms)
+  → Embedding (OpenAI text-embedding-3-small)
+  → Redis KNN retrieval (k × 3 candidates)
+  → FlashRank cross-encoder re-ranking → top k
+  → PII masking (regex-based redaction)
+  → LLM generation with source citations
+  → Streamed response (NDJSON)
+```
+
+### Key Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Re-ranker | `services/reranker.py` | Singleton FlashRank cross-encoder for relevance scoring |
+| PII Masker | `services/pii_masker.py` | Regex-based redaction of sensitive IDs, emails, phone numbers |
+| Retriever | `services/redis_vectorstore.py` | Redis vector search with optional re-ranking integration |
+| RAG Tools | `rag/tools.py` | LangChain tool with metadata-aware result formatting |
+| RAG Engine | `rag/engine.py` | LangGraph workflow: intent → rephrase → retrieve → generate |
+| Prompts | `rag/prompts.py` | System prompts for citation format and "I don't know" fallback |
+
+## Re-ranking & Evaluators
+
+### FlashRank Re-ranking (Implemented)
+
+Re-ranking acts as a **retrieval relevance evaluator** built directly into the pipeline. Instead of only relying on cosine similarity (which approximates relevance at the embedding level), the FlashRank cross-encoder scores each candidate passage *jointly with the query* to produce a more accurate relevance ordering.
+
+**How it works:**
+1. Over-retrieve `k × 3` candidates from Redis via cosine similarity
+2. Score all candidates with FlashRank (`ms-marco-MiniLM-L-12-v2`, ONNX, ~10-50ms)
+3. Return the top `k` by re-rank score
+4. Each document's metadata includes both `vector_score` (cosine) and `rerank_score` (cross-encoder)
+
+This directly addresses the **Retrieval Relevance** evaluator — measuring *"how relevant are my retrieved results for this query"*.
+
+### Evaluator Roadmap
+
+Re-ranking is one of several evaluator dimensions for RAG quality. We plan to incorporate additional evaluators in future iterations:
+
+| Evaluator | What it Measures | Status |
+|-----------|-----------------|--------|
+| **Retrieval Relevance** | Retrieved docs vs input — are the right chunks being found? | **Implemented** (FlashRank re-ranking) |
+| **Groundedness** | Response vs retrieved docs — does the answer stay faithful to the context? | Planned |
+| **Relevance** | Response vs input — does the answer actually address the user's question? | Planned |
+| **Correctness** | Response vs reference answer — is the answer factually correct? | Planned |
+
+**Planned approach:** Use LLM-as-judge evaluators (via LangSmith or custom) to assess each dimension. These can run offline on test datasets or as real-time guardrails.
 
 ## License
 

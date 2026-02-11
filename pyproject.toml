@@ -10,6 +10,7 @@ authors = [
 dependencies = [
     "bcrypt>=5.0.0",
     "boto3>=1.42.39",
+    "flashrank==0.2.10",
     "langchain-core==0.2.43",
     "langchain-openai==0.1.21",
     "langsmith>=0.1.147",

@@ -90,6 +90,7 @@ class InformationLookupTool(BaseTool):
     key_prefix: str | None = None
     top_k: int = 5
     user_index_names: List[str] | None = None  # Scoped indexes for multi-index search
+    rerank: bool = True
     retriever: BaseRetriever
 
     @root_validator(pre=True)
@@ -102,6 +103,11 @@ class InformationLookupTool(BaseTool):
         key_prefix = values.get("key_prefix", index_name if index_name else "default")
         user_index_names = values.get("user_index_names")
 
+        # Conditionally load the reranker module
+        reranker_module = None
+        if values.get("rerank", True):
+            from services import reranker as reranker_module
+
         retriever = load_vector_store(
             redis_url=settings.redis_url,
             index_name=index_name or "default",  # Placeholder, not used when index_name is None
@@ -113,8 +119,21 @@ class InformationLookupTool(BaseTool):
             key_prefix=key_prefix,
             search_kwargs={"k": values.get("top_k", 5)},
             user_index_names=user_index_names,
+            reranker=reranker_module,
         )
         return {**values, "retriever": retriever}
+
+    @staticmethod
+    def _format_results(results: List) -> List[str]:
+        """Format results with source metadata so the LLM can cite correctly."""
+        formatted = []
+        for r in results:
+            meta = getattr(r, "metadata", {})
+            filename = meta.get("filename", "Unknown")
+            page = meta.get("page_number", 0)
+            source = f"[Source: {filename}, Page {page}]" if page else f"[Source: {filename}]"
+            formatted.append(f"{source}\n{r.page_content}")
+        return formatted
 
     def _run(
         self,
@@ -122,7 +141,7 @@ class InformationLookupTool(BaseTool):
         filters: Optional[FILTERS] = None,
     ) -> List:
         results = self.retriever.invoke(query)
-        return [result.page_content for result in results]
+        return self._format_results(results)
 
     async def _arun(
         self,
@@ -132,7 +151,7 @@ class InformationLookupTool(BaseTool):
         logger.info("Embedding: {}", self.embedding_model)
         results = await self.retriever.ainvoke(query)
         logger.info("Results: {}", results)
-        return [result.page_content for result in results]
+        return self._format_results(results)
 # def vectorstore(self, index_name: str, embedding: "Embeddings") -> "VectorStore":
 #     vs = Redis.from_existing_index(
 #         redis_url=settings.redis_url,
