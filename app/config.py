@@ -36,7 +36,7 @@ class BaseConfig(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     refresh_token_expire_days: int = 21
-    langchain_api_key: str
+    langchain_api_key: str | None = None
 
     aws_access_key_id: str = ""
     aws_secret_access_key: SecretStr = SecretStr("")
