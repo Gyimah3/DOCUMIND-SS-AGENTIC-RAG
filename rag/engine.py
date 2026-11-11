@@ -14,9 +14,11 @@ from .tools import InformationLookupTool
 from app.config import settings
 
 
-os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "documindss"
+# LangSmith tracing is optional: only enable it when a key is configured.
+if settings.langchain_api_key:
+    os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "documindss"
 
 
 class GraphState(TypedDict):
@@ -26,7 +28,6 @@ class GraphState(TypedDict):
     keywords: list[str] 
 
 
-INDEX_SECHEMA_PATH = "backend/document/services/schema.yml"
 
 class UserIntent(BaseModel):
     """Classify user intent"""
