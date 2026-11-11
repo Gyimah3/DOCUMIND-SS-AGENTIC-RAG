@@ -1,111 +1,188 @@
-# DocuMindSS
+# DocuMind
 
-**DocuMind for Seedstars (SS)**
+**Retrieval-augmented question answering over private documents, built so that a wrong answer is harder to produce than no answer.**
 
-An intelligent document processing and RAG (Retrieval-Augmented Generation) system that enables natural language conversations with your documents.
+FastAPI, LangGraph, Redis vector search, PostgreSQL.
+
+---
+
+## The problem this is built around
+
+Retrieval-augmented generation is usually evaluated on whether it answers. The
+harder question is whether it should have. A system that reads a user's loan
+policy, employment contract or audit file and invents a plausible clause is
+worse than one that says it does not know, because the user has no way to tell
+the difference.
+
+Two things follow from that, and they shaped most of the design here:
+
+1. **Retrieval has to be measured, not assumed.** Cosine similarity over
+   embeddings approximates relevance; it does not establish it. So the pipeline
+   over-retrieves and then re-scores with a cross-encoder, and it keeps both
+   scores on every chunk so you can see where they disagree.
+2. **Abstention has to be a first-class output.** The model is instructed to say
+   "I don't know" and name which document would be needed, rather than answer
+   from parametric memory. An answer and a refusal are both results.
+
+Everything else is plumbing in service of those two.
+
+---
+
+## Pipeline
+
+```
+User query
+  → Intent detection          DOCUMENT_QUERY vs GENERAL_CONVERSATION
+  → Query rephrasing          rewrite into better search terms
+  → Embedding                 OpenAI text-embedding-3-small
+  → Redis KNN retrieval       over-retrieve k x 3 candidates
+  → Cross-encoder re-ranking  FlashRank ms-marco-MiniLM-L-12-v2, ONNX, ~10-50ms
+  → PII masking               regex redaction before the model sees the chunk
+  → Generation                with source citations
+  → Streamed response         NDJSON, token by token
+```
+
+The intent step exists so that "hello" does not trigger a vector search, and so
+that a question the documents cannot answer is routed to a refusal rather than
+to the model's own knowledge.
+
+PII masking runs **before** retrieved chunks reach the model, not after
+generation. Masking the output only hides leaks that have already happened.
+
+---
+
+## Retrieval evaluation
+
+Re-ranking here is a **retrieval relevance evaluator built into the request
+path**, not a quality nicety.
+
+1. Over-retrieve `k x 3` candidates from Redis by cosine similarity
+2. Score every candidate with FlashRank, which encodes query and passage
+   *jointly* rather than comparing two independent embeddings
+3. Keep the top `k` by cross-encoder score
+4. Attach both `vector_score` and `rerank_score` to each chunk's metadata
+
+Step 4 is the part worth keeping. When the two scores disagree sharply, that is
+a signal the embedding space is wrong for this query, and it is visible per
+request rather than hidden in an aggregate.
+
+### What is not measured yet
+
+Stated plainly, because an unmeasured dimension that is listed as "planned"
+somewhere is easy to mistake for one that is handled.
+
+| Dimension | Question it answers | Status |
+|---|---|---|
+| Retrieval relevance | Are the right chunks being found? | **Implemented** via cross-encoder re-ranking |
+| Groundedness | Does the answer stay inside the retrieved context? | Not implemented |
+| Answer relevance | Does the answer address what was asked? | Not implemented |
+| Correctness | Is the answer right against a reference? | Not implemented |
+
+The abstention behaviour is **prompt-level, not verified**. The system is
+instructed to refuse when the context does not support an answer, and in use it
+does, but there is no held-out set measuring how often it refuses when it should
+have answered, or answers when it should have refused. That false-refusal and
+false-answer rate is the obvious next thing to measure, and the honest position
+is that it currently is not.
+
+The intended approach for the remaining three is LLM-as-judge scoring, offline
+on a labelled set first, then as a request-time guardrail only if the judge
+itself survives a negative control.
+
+---
+
+## Design decisions worth explaining
+
+**Why a cross-encoder rather than a bigger embedding model.** A bi-encoder has
+to commit to a representation of the passage before it has seen the query.
+FlashRank runs the pair together and costs 10 to 50ms on ONNX, which fits inside
+a streaming response budget.
+
+**Why over-retrieve by 3x.** Re-ranking can only reorder what retrieval returned.
+Too small a candidate pool and the cross-encoder has nothing to fix.
+
+**Why Redis rather than a dedicated vector database.** Multi-tenant isolation is
+per-user index rather than metadata filtering, which removes a class of
+cross-tenant leakage at the storage layer instead of relying on query-time
+filters being written correctly every time.
+
+**Why source citations are mandatory in the prompt.** A citation to a document
+and page is checkable by the user. An uncited answer is not.
+
+**Why images go through a vision model into text.** Keeping one retrieval path
+rather than two avoids having to fuse rankings from two incomparable scoring
+systems.
+
+---
 
 ## Features
 
-- **Multi-format Document Support**: PDF, DOCX, XLSX, CSV, PPTX, Markdown, HTML, and plain text
-- **Agentic RAG**: Intent-aware query routing using LangGraph for intelligent document retrieval
-- **FlashRank Re-ranking**: Cross-encoder re-ranking layer between retrieval and generation for significantly improved answer relevance (see [Re-ranking & Evaluators](#re-ranking--evaluators))
-- **Source Citations**: Answers include exact document name and page references (e.g., *"Loan Policy.pdf (Page 3)"*)
-- **"I Don't Know" Fallback**: When the answer isn't in the documents, the system says so and suggests which file to upload
-- **PII / Sensitive ID Masking**: Regex-based redaction of SSNs, card numbers, IBANs, account numbers, emails, and phone numbers in all responses and retrieved chunks before they reach the user
-- **Multimodal Processing**: Extract and index images from documents with AI-generated descriptions
-- **Dedicated Table Extraction**: Preserves table structure from PDFs and documents
-- **Multi-tenant Architecture**: Secure user isolation with per-user document indexes
-- **Vector Search**: Redis-powered semantic search with OpenAI embeddings
-- **Real-time Streaming**: Token-by-token response streaming via NDJSON
+- Multi-format ingestion: PDF, DOCX, XLSX, CSV, PPTX, Markdown, HTML, plain text
+- Agentic RAG with intent-aware routing (LangGraph)
+- Cross-encoder re-ranking between retrieval and generation
+- Source citations with document name and page, for example *Loan Policy.pdf (Page 3)*
+- "I don't know" fallback that names the document that would be needed
+- PII redaction of SSNs, card numbers, IBANs, account numbers, emails, phone numbers
+- Multimodal: images extracted and indexed via generated descriptions
+- Table extraction that preserves structure
+- Multi-tenant isolation with per-user document indexes
+- Token-by-token streaming over NDJSON
 
-## Tech Stack
+## Tech stack
 
-- **Backend**: FastAPI, Python 3.12
-- **Database**: PostgreSQL 16 (metadata), Redis Stack (vectors)
-- **AI/ML**: OpenAI GPT-4, LangChain, LangGraph, FlashRank (ONNX re-ranker)
-- **Storage**: AWS S3 for document storage
-- **Document Processing**: PyMuPDF, pdfplumber, python-docx, unstructured
+FastAPI, Python 3.12 · PostgreSQL 16 for metadata · Redis Stack for vectors ·
+OpenAI GPT-4 and text-embedding-3-small · LangChain and LangGraph ·
+FlashRank ONNX re-ranker · AWS S3 · PyMuPDF, pdfplumber, python-docx, unstructured
 
-## Quick Start
+---
 
-### Prerequisites
+## Quick start
 
-- Docker & Docker Compose
-- OpenAI API key
-- AWS S3 bucket and credentials
+Prerequisites: Docker and Docker Compose, an OpenAI API key, an S3 bucket.
 
-### Installation
+```bash
+git clone <your-repo-url>
+cd DocuMindSS
+cp .env.example .env            # add your credentials
+docker-compose up -d --build
+docker-compose exec app alembic upgrade head
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd DocuMindSS
-   ```
+App at http://localhost:8001 · RedisInsight at http://localhost:8002
 
-2. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
+### Without Docker
 
-3. **Start the services**
-   ```bash
-   docker-compose up -d --build
-   ```
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
 
-4. **Run database migrations**
-   ```bash
-   docker-compose exec app alembic upgrade head
-   ```
-
-5. **Access the application**
-   - App: http://localhost:8001
-   - RedisInsight: http://localhost:8002
-
-## Environment Variables
+## Environment variables
 
 | Variable | Description | Required |
-|----------|-------------|----------|
+|---|---|---|
 | `POSTGRES_PASSWORD` | PostgreSQL password | Yes |
-| `POSTGRES_DB` | Database name (default: documindss) | No |
+| `POSTGRES_DB` | Database name, default `documindss` | No |
 | `SECRET_KEY` | JWT signing key | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for embeddings & chat | Yes |
+| `OPENAI_API_KEY` | Embeddings and chat | Yes |
 | `AWS_ACCESS_KEY_ID` | AWS access key | Yes |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | Yes |
 | `AWS_BUCKET_NAME` | S3 bucket for documents | Yes |
-| `AWS_REGION` | AWS region (default: us-east-1) | No |
-| `LANGCHAIN_API_KEY` | LangSmith API key (optional) | No |
+| `AWS_REGION` | Default `us-east-1` | No |
+| `LANGCHAIN_API_KEY` | LangSmith tracing | No |
 | `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing | No |
 
-## Usage
-
-### Upload Documents
-
-1. Click the **+** button in the chat input
-2. Select **Upload Document**
-3. Choose a file and set a document identifier
-4. Enable multimodal processing if needed for image extraction
-
-### Chat with Documents
-
-- **Tagged Mode**: Attach a specific document to focus the conversation
-- **All Documents Mode**: Chat across all your uploaded documents without tagging
-
-### Document Management
-
-- Navigate to **Documents** in the sidebar to view, preview, and delete documents
-- Each document is indexed in Redis for fast semantic search
-
-## API Endpoints
+## API
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/auth/login` | POST | User authentication |
+|---|---|---|
 | `/auth/register` | POST | User registration |
-| `/api/v1/vectorstore/add-document` | POST | Upload and index document |
-| `/api/v1/vectorstore/list-indexes` | GET | List user's document indexes |
+| `/auth/login` | POST | Authentication |
+| `/api/v1/vectorstore/add-document` | POST | Upload and index a document |
+| `/api/v1/vectorstore/list-indexes` | GET | List the user's indexes |
 | `/api/v1/documents/{index}/list` | GET | List documents in an index |
-| `/api/v1/rag/chat` | POST | Chat with documents (streaming) |
+| `/api/v1/rag/chat` | POST | Chat with documents, streaming |
 
 ## Architecture
 
@@ -123,96 +200,47 @@ An intelligent document processing and RAG (Retrieval-Augmented Generation) syst
             └───────────┘ └───────────┘ └───────────┘
 ```
 
-## Development
+## Where to look in the code
 
-### Local Development (without Docker)
+| Component | File | Purpose |
+|---|---|---|
+| RAG engine | `rag/engine.py` | LangGraph workflow: intent → rephrase → retrieve → generate |
+| Prompts | `rag/prompts.py` | Citation format and the "I don't know" instruction |
+| RAG tools | `rag/tools.py` | LangChain tool with metadata-aware formatting |
+| Re-ranker | `services/reranker.py` | Singleton FlashRank cross-encoder |
+| Retriever | `services/redis_vectorstore.py` | Redis vector search, re-ranking integration |
+| PII masker | `services/pii_masker.py` | Regex redaction of sensitive identifiers |
+| Loaders | `document/document_loaders/` | One loader per supported format |
 
-```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the app
-uvicorn main:app --reload --port 8001
-```
-
-### Project Structure
+Longer write-ups: [`RAG_APPROACH.md`](./RAG_APPROACH.md),
+[`TECHNICAL_NOTE.md`](./TECHNICAL_NOTE.md), [`docs/RERANKING.md`](./docs/RERANKING.md).
 
 ```
 DocuMindSS/
-├── api/routes/          # API endpoints
-├── app/                  # Application config & container
-├── database/            # SQLAlchemy models & session
-├── document/            # Document loaders & processors
-├── frontend/            # Static HTML/CSS/JS
-├── middleware/          # Auth middleware
-├── rag/                 # LangGraph RAG implementation
-├── services/            # Redis vectorstore, storage
-├── main.py              # Application entry point
-├── Dockerfile
-├── docker-compose.yml
-└── requirements.txt
+├── api/routes/     # API endpoints
+├── app/            # Config and DI container
+├── database/       # SQLAlchemy models and session
+├── document/       # Loaders and processors
+├── frontend/       # Static HTML/CSS/JS
+├── middleware/     # Auth
+├── rag/            # LangGraph RAG implementation
+├── services/       # Redis vectorstore, re-ranker, PII masking, storage
+└── main.py
 ```
 
-## RAG Pipeline Overview
+## Usage
 
-```
-User query
-  → Intent detection (DOCUMENT_QUERY vs GENERAL_CONVERSATION)
-  → Query rephrasing (better search terms)
-  → Embedding (OpenAI text-embedding-3-small)
-  → Redis KNN retrieval (k × 3 candidates)
-  → FlashRank cross-encoder re-ranking → top k
-  → PII masking (regex-based redaction)
-  → LLM generation with source citations
-  → Streamed response (NDJSON)
-```
+Upload through the **+** button in the chat input, set a document identifier,
+and enable multimodal processing if the file has images worth indexing.
 
-### Key Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| Re-ranker | `services/reranker.py` | Singleton FlashRank cross-encoder for relevance scoring |
-| PII Masker | `services/pii_masker.py` | Regex-based redaction of sensitive IDs, emails, phone numbers |
-| Retriever | `services/redis_vectorstore.py` | Redis vector search with optional re-ranking integration |
-| RAG Tools | `rag/tools.py` | LangChain tool with metadata-aware result formatting |
-| RAG Engine | `rag/engine.py` | LangGraph workflow: intent → rephrase → retrieve → generate |
-| Prompts | `rag/prompts.py` | System prompts for citation format and "I don't know" fallback |
-
-## Re-ranking & Evaluators
-
-### FlashRank Re-ranking (Implemented)
-
-Re-ranking acts as a **retrieval relevance evaluator** built directly into the pipeline. Instead of only relying on cosine similarity (which approximates relevance at the embedding level), the FlashRank cross-encoder scores each candidate passage *jointly with the query* to produce a more accurate relevance ordering.
-
-**How it works:**
-1. Over-retrieve `k × 3` candidates from Redis via cosine similarity
-2. Score all candidates with FlashRank (`ms-marco-MiniLM-L-12-v2`, ONNX, ~10-50ms)
-3. Return the top `k` by re-rank score
-4. Each document's metadata includes both `vector_score` (cosine) and `rerank_score` (cross-encoder)
-
-This directly addresses the **Retrieval Relevance** evaluator — measuring *"how relevant are my retrieved results for this query"*.
-
-### Evaluator Roadmap
-
-Re-ranking is one of several evaluator dimensions for RAG quality. We plan to incorporate additional evaluators in future iterations:
-
-| Evaluator | What it Measures | Status |
-|-----------|-----------------|--------|
-| **Retrieval Relevance** | Retrieved docs vs input — are the right chunks being found? | **Implemented** (FlashRank re-ranking) |
-| **Groundedness** | Response vs retrieved docs — does the answer stay faithful to the context? | Planned |
-| **Relevance** | Response vs input — does the answer actually address the user's question? | Planned |
-| **Correctness** | Response vs reference answer — is the answer factually correct? | Planned |
-
-**Planned approach:** Use LLM-as-judge evaluators (via LangSmith or custom) to assess each dimension. These can run offline on test datasets or as real-time guardrails.
+Tagged mode attaches one document to the conversation. All-documents mode
+searches across everything the user has uploaded. Documents can be previewed and
+deleted from the sidebar.
 
 ## License
 
-MIT License
+MIT
 
-## Support
+---
 
-For issues and feature requests, please open an issue on GitHub.
+Built by [Gideon Gyimah](https://gyimah3.github.io). Issues and pull requests welcome.
